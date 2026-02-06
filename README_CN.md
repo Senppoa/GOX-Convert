@@ -1,193 +1,164 @@
-# Gaussian和ORCA文件格式转换工具
+# GOX-Convert
 
-一个强大且全面的Python工具，用于计算化学文件格式之间的相互转换，支持Gaussian (log, gjf)、ORCA (inp) 和 xyz 格式。
+**GOX-Convert** 是一个用于计算化学领域的文件格式转换工具，支持 Gaussian 和 ORCA 量子化学计算软件之间的文件格式相互转换。
 
-## 功能特性
+## 功能简介
 
-### Gaussian格式转换
-- ✅ **log → xyz**: 从Gaussian计算结果提取结构
-- ✅ **log → gjf**: 从计算结果创建新的输入文件
-- ✅ **xyz → gjf**: 从结构文件创建Gaussian输入文件
-- ✅ **gjf → xyz**: 从输入文件提取结构
+本工具支持以下文件格式之间的相互转换：
 
-### ORCA格式转换
-- ✅ **gjf → inp**: 将Gaussian输入文件转换为ORCA输入文件
-- ✅ **xyz → inp**: 从结构文件创建ORCA输入文件
-- ✅ **inp → xyz**: 从ORCA输入文件提取结构
-- ✅ **inp → gjf**: 将ORCA输入文件转换为Gaussian输入文件
+- **Gaussian 格式**: `.log` (输出文件), `.gjf` (输入文件)
+- **ORCA 格式**: `.inp` (输入文件)
+- **通用格式**: `.xyz` (分子结构文件)
 
-### 通用特性
-- ✅ 支持批量转换
-- ✅ 自动检查计算是否正常终止（log文件）
-- ✅ 生成成功/失败文件列表
-- ✅ 面向对象设计，易于集成到其他项目
-- ✅ 进度条显示，友好的用户体验
-- ✅ 灵活的参数配置
+## 支持的原子
 
-## 依赖项
+工具内置了常见原子的原子序数到元素符号的映射，包括：
+- 主族元素：H, He, Li, Be, B, C, N, O, F, Ne, Na, Mg, Al, Si, P, S, Cl, Ar, K, Ca
+- 过渡金属：Fe, Co, Ni, Cu, Zn, Zr, Rh, Pd, Ag, Ir, Pt, Au
+- 卤素和其他：Br, I
+
+## 主要功能
+
+### 1. log 转 xyz
+
+从 Gaussian 的 log 输出文件中提取最终优化后的分子结构，保存为 xyz 格式。
+
+**特性：**
+- 自动检查计算是否正常终止 (Normal termination)
+- 从后向前查找标准坐标 (Standard orientation)，确保获取最终结构
+- 支持批量处理整个文件夹
+- 可生成成功/失败文件列表
+
+### 2. log 转 gjf
+
+将 Gaussian 的 log 文件转换为新的 gjf 输入文件，用于后续计算。
+
+**特性：**
+- 自动提取电荷和自旋多重度
+- 支持自定义计算方法、基组、关键词
+- 支持 Link1 多步计算
+- 可添加 nosave 关键词
+
+### 3. xyz 转 gjf
+
+将 xyz 结构文件转换为 Gaussian 输入文件。
+
+**特性：**
+- 自动读取原子数量和标题
+- 支持自定义计算参数
+- 批量处理多个文件
+
+### 4. gjf 转 xyz
+
+从 Gaussian 输入文件中提取分子坐标，保存为 xyz 格式。
+
+**特性：**
+- 自动识别坐标部分
+- 正确处理电荷和自旋多重度行
+- 支持 Link1 分隔符
+
+### 5. gjf 转 inp
+
+将 Gaussian 输入文件转换为 ORCA 输入文件。
+
+**特性：**
+- 支持自定义泛函和基组
+- 可设置并行核心数和内存
+- 支持额外的 ORCA 关键词
+
+### 6. xyz 转 inp
+
+将 xyz 结构文件直接转换为 ORCA 输入文件。
+
+**特性：**
+- 保持分子结构信息
+- 支持完整的 ORCA 计算参数设置
+
+### 7. inp 转 gjf
+
+将 ORCA 输入文件转换为 Gaussian 输入文件。
+
+**特性：**
+- 解析 ORCA 坐标部分
+- 转换为 Gaussian 格式
+
+### 8. log 转 inp
+
+直接将 Gaussian log 文件转换为 ORCA 输入文件。
+
+**特性：**
+- 提取最终优化结构
+- 生成 ORCA 格式的输入文件
+
+## 安装要求
+
+### 依赖包
 
 ```bash
 pip install tqdm natsort
 ```
 
+### Python 版本
+
+- Python 3.6 或更高版本
+
 ## 使用方法
 
-### 方法1: 交互式命令行
-
-直接运行脚本，按照提示操作：
-
-```bash
-python gaussian_converter.py
-```
-
-程序会引导你：
-1. 选择转换类型（8种转换方式）
-2. 输入源文件/文件夹路径
-3. 输入输出路径（可选）
-4. 根据转换类型设置相关参数
-
-### 方法2: 编程式调用
-
-在你的Python脚本中导入并使用：
-
-## Gaussian格式转换示例
-
-### 示例1: log → xyz
+### 作为模块导入使用
 
 ```python
-from gaussian_converter import GaussianConverter
+from gaussian_orca_converter import GaussianConverter
 
-# 创建转换器
-converter = GaussianConverter(
-    input_path='./log_files',      # log文件所在文件夹
-    output_path='./xyz_output'     # 输出文件夹
-)
+# 初始化转换器
+converter = GaussianConverter(input_path="path/to/input", output_path="path/to/output")
 
-# 执行转换
-success, success_files, error_files = converter.log_to_xyz(
-    check_termination=True,         # 检查是否正常终止
-    save_success_list=True          # 保存成功/失败文件列表
-)
+# log 转 xyz
+converter.log_to_xyz(check_termination=True, save_success_list=True)
 
-print(f"成功: {success}, 失败: {len(error_files)}")
-```
-
-### 示例2: log → gjf
-
-```python
-from gaussian_converter import GaussianConverter
-
-converter = GaussianConverter('./log_files', './gjf_output')
-
+# log 转 gjf
 converter.log_to_gjf(
-    nproc='32',                     # 处理器核心数
-    mem='64GB',                     # 内存
-    method='b3lyp',                 # 计算方法
-    basis='def2svp',                # 基组
-    extra_keywords='opt freq',      # 额外关键词
-    charge=0,                       # 电荷
-    mult=1,                         # 自旋多重度
-    nosave=False                    # 是否添加nosave
-)
-```
-
-### 示例3: xyz → gjf (用于过渡态计算)
-
-```python
-from gaussian_converter import GaussianConverter
-
-converter = GaussianConverter('./xyz_files', './ts_gjf_output')
-
-converter.xyz_to_gjf(
-    nproc='48',
-    mem='128GB',
-    method='wb97xd',
-    basis='def2tzvp',
-    extra_keywords='opt(ts,calcfc,noeigen) freq',
+    nproc='32',
+    mem='64GB',
+    method='b3lyp',
+    basis='def2svp',
+    extra_keywords='opt freq',
     charge=0,
     mult=1
 )
-```
 
-### 示例4: gjf → xyz
-
-```python
-from gaussian_converter import GaussianConverter
-
-converter = GaussianConverter('./gjf_files', './xyz_output')
-converter.gjf_to_xyz()
-```
-
-## ORCA格式转换示例
-
-### 示例5: gjf → inp (Gaussian到ORCA)
-
-```python
-from gaussian_converter import GaussianConverter
-
-# 批量将Gaussian的gjf文件转换为ORCA的inp文件
-converter = GaussianConverter('./gjf_files', './orca_inp_output')
-
-converter.gjf_to_inp(
-    job_type='Opt NumFreq',         # ORCA任务类型
-    functional='wB97M-V',           # 泛函
-    basis_set='def2-TZVPD',         # 基组
-    nproc=32,                       # 处理器核心数
-    maxcore=20000,                  # 每核心最大内存(MB)
-    extra_keywords=''               # 额外ORCA关键词
-)
-```
-
-**输出的ORCA inp文件示例：**
-```
-! Opt NumFreq wB97M-V def2-TZVPD
-
-%maxcore 20000
-%pal nprocs 32 end
-
-* xyz 0 1
- C                  -0.123     0.456    -0.789
- H                   0.890     0.123     0.456
- ...
- *
-```
-
-### 示例6: xyz → inp (创建ORCA输入文件)
-
-```python
-from gaussian_converter import GaussianConverter
-
-converter = GaussianConverter('./xyz_files', './orca_inp_output')
-
-converter.xyz_to_inp(
-    job_type='Opt',                 # 只做优化
-    functional='B3LYP',
-    basis_set='def2-SVP',
-    nproc=24,
-    maxcore=20000,
+# xyz 转 gjf
+converter.xyz_to_gjf(
+    nproc='32',
+    mem='64GB',
+    method='b3lyp',
+    basis='def2svp',
+    extra_keywords='opt freq',
     charge=0,
-    mult=1,
-    extra_keywords='def2/J RIJCOSX'  # 使用RIJCOSX近似
+    mult=1
 )
-```
 
-### 示例7: inp → xyz (从ORCA提取结构)
+# gjf 转 xyz
+converter.gjf_to_xyz()
 
-```python
-from gaussian_converter import GaussianConverter
+# gjf 转 inp
+converter.gjf_to_inp(
+    job_type="Opt NumFreq",
+    functional="wB97M-V",
+    basis_set="def2-TZVPD",
+    nproc=32,
+    maxcore=20000
+)
 
-converter = GaussianConverter('./inp_files', './xyz_output')
-converter.inp_to_xyz()
-```
+# xyz 转 inp
+converter.xyz_to_inp(
+    job_type="Opt NumFreq",
+    functional="wB97M-V",
+    basis_set="def2-TZVPD",
+    nproc=32,
+    maxcore=20000
+)
 
-### 示例8: inp → gjf (ORCA到Gaussian)
-
-```python
-from gaussian_converter import GaussianConverter
-
-# 将ORCA的inp文件转换为Gaussian的gjf文件
-converter = GaussianConverter('./inp_files', './gjf_output')
-
+# inp 转 gjf
 converter.inp_to_gjf(
     nproc='32',
     mem='64GB',
@@ -195,281 +166,137 @@ converter.inp_to_gjf(
     basis='def2svp',
     extra_keywords='opt freq'
 )
-```
 
-## 实际应用场景
-
-### 场景1: XTB → DFT 工作流
-
-从XTB优化结果创建DFT计算输入：
-
-```python
-# 第1步: 从XTB log提取结构
-converter1 = GaussianConverter('./xtb_logs', './xtb_xyz')
-converter1.log_to_xyz(check_termination=True)
-
-# 第2步: 创建Gaussian DFT输入文件
-converter2 = GaussianConverter('./xtb_xyz', './dft_gjf')
-converter2.xyz_to_gjf(
-    method='wb97xd',
-    basis='def2svp',
-    extra_keywords='opt freq'
+# log 转 inp
+converter.log_to_inp(
+    job_type="Opt NumFreq",
+    functional="wB97M-V",
+    basis_set="def2-TZVPD",
+    nproc=32,
+    maxcore=20000
 )
 ```
 
-### 场景2: Gaussian → ORCA 迁移
+### 批量处理
 
-将现有的Gaussian计算迁移到ORCA：
-
-```python
-# 直接从gjf创建ORCA输入
-converter = GaussianConverter('./gaussian_inputs', './orca_inputs')
-converter.gjf_to_inp(
-    job_type='Opt NumFreq',
-    functional='wB97M-V',
-    basis_set='def2-TZVPD',
-    nproc=32
-)
-```
-
-### 场景3: 批量IRC计算准备
-
-从过渡态结果批量创建IRC计算输入：
+当输入路径为文件夹时，工具会自动处理该文件夹中所有匹配的文件：
 
 ```python
-# 先从过渡态log提取结构
-converter1 = GaussianConverter('./ts_logs', './ts_xyz')
-converter1.log_to_xyz(check_termination=True)
-
-# 创建IRC gjf文件
-converter2 = GaussianConverter('./ts_xyz', './irc_gjf')
-converter2.xyz_to_gjf(
-    nproc='32',
-    method='wb97xd',
-    basis='def2svp',
-    extra_keywords='IRC(calcfc,maxpoints=100)'
-)
+# 批量转换整个文件夹的 log 文件
+converter = GaussianConverter(input_path="./log_files", output_path="./xyz_files")
+converter.log_to_xyz()
 ```
 
-### 场景4: 跨平台计算
-
-在不同的计算程序间切换：
-
-```python
-# ORCA优化 → Gaussian单点能计算
-converter1 = GaussianConverter('./orca_opt_inp', './structures')
-converter1.inp_to_xyz()
-
-converter2 = GaussianConverter('./structures', './gaussian_sp')
-converter2.xyz_to_gjf(
-    method='ccsd(t)',
-    basis='def2tzvpp',
-    extra_keywords='sp'
-)
-```
-
-## 类方法详细说明
-
-### GaussianConverter类
-
-#### 初始化参数
-
-```python
-GaussianConverter(input_path, output_path=None)
-```
-
-- `input_path` (str): 输入文件或文件夹路径
-- `output_path` (str, 可选): 输出文件夹路径，默认为 `./converted_files`
-
-#### Gaussian格式转换方法
-
-##### `log_to_xyz(check_termination=True, save_success_list=True)`
-
-将Gaussian log文件转换为xyz文件。
-
-**返回:** `(success_count, success_files, error_files)`
-
-##### `log_to_gjf(...)`
-
-将log文件转换为gjf文件。
-
-**参数:**
-- `nproc` (str): 处理器核心数，默认'32'
-- `mem` (str): 内存大小，默认'64GB'
-- `method` (str): 计算方法，默认'b3lyp'
-- `basis` (str): 基组，默认'def2svp'
-- `extra_keywords` (str): 额外关键词，默认'opt freq'
-- `link1_method` (str): Link1的计算方法
-- `link1_basis` (str): Link1的基组
-- `charge` (int): 电荷，默认0
-- `mult` (int): 自旋多重度，默认1
-- `nosave` (bool): 是否添加nosave
-
-**返回:** `int` - 成功转换的文件数
-
-##### `xyz_to_gjf(...)`
-
-将xyz文件转换为gjf文件。参数与 `log_to_gjf` 类似（不包括link1相关）。
-
-##### `gjf_to_xyz()`
-
-将gjf文件转换为xyz文件。
-
-#### ORCA格式转换方法
-
-##### `gjf_to_inp(...)`
-
-将Gaussian gjf文件转换为ORCA inp文件。
-
-**参数:**
-- `job_type` (str): ORCA任务类型，默认"Opt NumFreq"
-- `functional` (str): 泛函，默认"wB97M-V"
-- `basis_set` (str): 基组，默认"def2-TZVPD"
-- `nproc` (int): 处理器核心数，默认32
-- `maxcore` (int): 每核心最大内存(MB)，默认20000
-- `extra_keywords` (str): 额外ORCA关键词
-
-**返回:** `int` - 成功转换的文件数
-
-##### `xyz_to_inp(...)`
-
-将xyz文件转换为ORCA inp文件。
-
-**参数:** 与 `gjf_to_inp` 类似，额外需要 `charge` 和 `mult`
-
-##### `inp_to_xyz()`
-
-将ORCA inp文件转换为xyz文件。
-
-##### `inp_to_gjf(...)`
-
-将ORCA inp文件转换为Gaussian gjf文件。
-
-**参数:** 与 `log_to_gjf` 类似
-
-## 输出说明
-
-### log_to_xyz
-
-输出文件夹包含：
-- `*.xyz`: 转换后的xyz文件
-- `success_files.txt`: 成功转换的文件列表
-- `error_files.txt`: 失败的文件列表
-
-### 其他转换
-
-输出文件夹包含相应格式的转换文件，以及转换统计信息。
-
-## 支持的原子类型
-
-脚本内置了常见原子的序数到符号的映射，包括：
-- **主族元素**: H, He, Li, Be, B, C, N, O, F, Ne, Na, Mg, Al, Si, P, S, Cl, Ar
-- **过渡金属**: K, Ca, Fe, Co, Ni, Cu, Zn, Rh, Pd, Ag, Zr, Ir, Pt, Au
-- **卤素**: F, Cl, Br, I
-
-如需添加其他元素，可修改类中的 `ATOM_SYMBOL_MAP` 字典。
-
-## 常用ORCA任务类型
-
-### 优化和频率
-- `Opt`: 几何优化
-- `Freq`: 频率计算
-- `NumFreq`: 数值频率计算
-- `Opt Freq`: 优化+频率
-- `Opt NumFreq`: 优化+数值频率
-
-### 过渡态搜索
-- `OptTS`: 过渡态优化
-- `OptTS NumFreq`: 过渡态优化+数值频率
-
-### 单点能
-- `SP`: 单点能计算
-
-### 常用泛函和基组组合
-
-#### 常用泛函
-- `B3LYP`: 经典杂化泛函
-- `wB97M-V`: 考虑色散的meta-GGA泛函
-- `wB97X-D3`: 带D3色散校正
-- `PBE0`: 另一个流行的杂化泛函
-- `CCSD(T)`: 高精度后HF方法
-
-#### 常用基组
-- `def2-SVP`: 小基组，快速计算
-- `def2-TZVP`: 三zeta基组
-- `def2-TZVPD`: 带弥散函数的三zeta基组
-- `cc-pVDZ`, `cc-pVTZ`: 相关一致基组
-
-#### 辅助基组和加速
-- `def2/J`: RIJCOSX的辅助基组
-- `RIJCOSX`: 分辨率恒等近似，加速混合泛函计算
-- `strongSCF`: 更稳定的SCF收敛
-
-## 常见问题
-
-### Q1: 转换时提示"Could not extract coordinates"？
-
-**A:** 检查输入文件格式是否正确，特别是：
-- gjf文件是否有电荷和自旋多重度行
-- xyz文件第一行是否为原子数
-- inp文件是否有 `* xyz` 关键字
-
-### Q2: ORCA inp文件的内存设置怎么理解？
-
-**A:** `maxcore` 是每个核心的最大内存（单位MB）。总内存 = maxcore × nprocs / 1024 GB
-
-例如：`maxcore=20000`, `nprocs=32` → 总内存 ≈ 625 GB
-
-### Q3: 如何添加更复杂的ORCA关键词？
-
-**A:** 使用 `extra_keywords` 参数：
-
-```python
-converter.xyz_to_inp(
-    extra_keywords='def2/J RIJCOSX strongSCF'
-)
-```
-
-### Q4: 转换后的文件编码问题？
-
-**A:** 所有文件默认使用UTF-8编码。如遇到问题，检查原文件编码。
-
-### Q5: 批量转换时如何跳过已存在的文件？
-
-**A:** 当前版本会覆盖已存在的文件。如需跳过，可以先检查输出目录或手动实现：
-
-```python
-import os
-from gaussian_converter import GaussianConverter
-
-input_files = ['file1.xyz', 'file2.xyz']
-for f in input_files:
-    output_file = f.replace('.xyz', '.gjf')
-    if not os.path.exists(output_file):
-        converter = GaussianConverter(f, './output')
-        converter.xyz_to_gjf()
-```
+## 参数说明
+
+### 通用参数
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `input_path` | str | 必填 | 输入文件或文件夹路径 |
+| `output_path` | str | None | 输出文件夹路径，默认为 `converted_files` |
+
+### log_to_xyz 参数
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `check_termination` | bool | True | 是否检查正常终止 |
+| `save_success_list` | bool | True | 是否保存成功/失败文件列表 |
+
+### log_to_gjf / xyz_to_gjf / inp_to_gjf 参数
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `nproc` | str | '32' | 处理器核心数 |
+| `mem` | str | '64GB' | 内存大小 |
+| `method` | str | 'b3lyp' | 计算方法/泛函 |
+| `basis` | str | 'def2svp' | 基组 |
+| `extra_keywords` | str | 'opt freq' | 额外关键词 |
+| `link1_method` | str | '' | Link1 的计算方法 |
+| `link1_basis` | str | '' | Link1 的基组 |
+| `charge` | int | 0 | 电荷 |
+| `mult` | int | 1 | 自旋多重度 |
+| `nosave` | bool | False | 是否添加 nosave 关键词 |
+
+### gjf_to_inp / xyz_to_inp / log_to_inp 参数
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `job_type` | str | "Opt NumFreq" | ORCA 任务类型 |
+| `functional` | str | "wB97M-V" | 泛函 |
+| `basis_set` | str | "def2-TZVPD" | 基组 |
+| `nproc` | int | 32 | 处理器核心数 |
+| `maxcore` | int | 20000 | 每个核心的最大内存 (MB) |
+| `extra_keywords` | str | "" | 额外的 ORCA 关键词 |
+
+## 输出文件
+
+转换完成后，工具会输出以下信息：
+
+1. **转换后的文件**: 保存在指定的输出目录中
+2. **success_files.txt**: 成功转换的文件列表 (仅在 `save_success_list=True` 时生成)
+3. **error_files.txt**: 转换失败的文件列表 (仅在 `save_success_list=True` 时生成)
 
 ## 注意事项
 
-1. **编码问题**: log文件使用UTF-8编码读取
-2. **路径分隔符**: Windows系统建议使用原始字符串 `r'path'` 或正斜杠 `/`
-3. **内存设置**: 根据实际计算体系大小合理设置
-4. **检查输出**: 转换后建议检查生成的文件
-5. **电荷和多重度**: gjf→inp转换会自动提取，xyz→inp需要手动指定
+1. **文件编码**: 工具使用 UTF-8 编码读取和写入文件
+2. **坐标提取**: log 文件转换时，工具会从后向前查找标准坐标，确保获取最终优化结构
+3. **批量处理**: 使用 `tqdm` 显示进度条，`natsort` 进行自然排序
+4. **错误处理**: 工具会捕获异常并继续处理其他文件，不会中断批量转换
 
-## 更新日志
+## 示例
 
-- **2025-10-20**: 初始版本，整合Gaussian和ORCA转换功能
-  - 支持8种格式转换
-  - 批量处理
-  - 交互式和编程式两种使用方式
+### 示例 1: 提取优化后的结构
+
+```python
+from gaussian_orca_converter import GaussianConverter
+
+# 从 log 文件提取最终结构
+converter = GaussianConverter("molecule.log", "./output")
+converter.log_to_xyz(check_termination=True)
+```
+
+### 示例 2: 批量生成 ORCA 输入文件
+
+```python
+from gaussian_orca_converter import GaussianConverter
+
+# 将 xyz 文件批量转换为 ORCA 输入文件
+converter = GaussianConverter("./xyz_structures", "./orca_inputs")
+converter.xyz_to_inp(
+    job_type="Opt Freq",
+    functional="B3LYP",
+    basis_set="def2-SVP",
+    nproc=16,
+    maxcore=4000
+)
+```
+
+### 示例 3: 创建多步计算输入文件
+
+```python
+from gaussian_orca_converter import GaussianConverter
+
+# 创建包含 Link1 的 Gaussian 输入文件
+converter = GaussianConverter("molecule.log", "./output")
+converter.log_to_gjf(
+    method='b3lyp',
+    basis='def2svp',
+    extra_keywords='opt',
+    link1_method='wB97M-V',
+    link1_basis='def2tzvpd',
+    extra_keywords_link1='freq'
+)
+```
 
 ## 许可证
 
-本工具整合自多个原始脚本，保留原作者信息。
+本项目为开源项目，可自由使用和修改。
 
-## 贡献
+## 作者信息
 
-欢迎提交问题和改进建议！
+请联系tkun@mail.dlut.edu.cn 进行问题反馈或建议。
 
+## 更新日志
+
+- **2025-10-20**: 初始版本发布，支持基本的文件格式转换功能
