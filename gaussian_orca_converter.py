@@ -300,6 +300,7 @@ class GaussianConverter:
                    method: str = 'b3lyp', basis: str = 'def2svp',
                    extra_keywords: str = 'opt freq',
                    charge: int = 0, mult: int = 1,
+                   link1_method: str = '',
                    nosave: bool = False) -> int:
         """
         将xyz文件转换为gjf文件
@@ -311,6 +312,7 @@ class GaussianConverter:
         :param extra_keywords: 额外关键词
         :param charge: 电荷
         :param mult: 自旋多重度
+        :param link1_method: Link1的计算方法（如果需要）
         :param nosave: 是否添加nosave关键词
         :return: 成功转换的文件数
         """
@@ -355,12 +357,27 @@ class GaussianConverter:
                 if mem:
                     gjf_content += f"%mem={mem}\n"
                 gjf_content += f"%chk={name}.chk\n"
-                if nosave:
+                if nosave and link1_method == '':
                     gjf_content += "%nosave\n"
                 
-                gjf_content += f"# {method}/{basis} {extra_keywords}\n\n"
+                if basis == '':
+                    gjf_content += f"# {method} {extra_keywords}\n\n"
+                else:
+                    gjf_content += f"# {method}/{basis} {extra_keywords}\n\n"
                 gjf_content += f"{title}\n\n"
                 gjf_content += coord_section + "\n"
+
+                # 如果有Link1部分
+                if link1_method:
+                    gjf_content += "--Link1--\n"
+                    gjf_content += f"%nprocshared={nproc}\n"
+                    if mem:
+                        gjf_content += f"%mem={mem}\n"
+                    gjf_content += f"%chk={name}.chk\n"
+                    if nosave:
+                        gjf_content += "%nosave\n"
+
+                    gjf_content += f"# {link1_method} geom=allcheck\n\n"
                 
                 # 保存gjf文件
                 output_file = os.path.join(self.output_path, f"{name}.gjf")
@@ -747,6 +764,7 @@ class GaussianConverter:
     def inp_to_gjf(self, nproc: str = '32', mem: str = '64GB',
                    method: str = 'b3lyp', basis: str = 'def2svp',
                    extra_keywords: str = 'opt freq',
+                   link1_method: str = '',
                    nosave: bool = False) -> int:
         """
         将ORCA inp文件转换为Gaussian gjf文件
@@ -756,6 +774,7 @@ class GaussianConverter:
         :param method: 计算方法
         :param basis: 基组
         :param extra_keywords: 额外关键词
+        :param link1_method: Link1的计算方法（如果需要）
         :param nosave: 是否添加nosave关键词
         :return: 成功转换的文件数
         """
@@ -822,13 +841,28 @@ class GaussianConverter:
                 if mem:
                     gjf_content += f"%mem={mem}\n"
                 gjf_content += f"%chk={name}.chk\n"
-                if nosave:
+                if nosave and link1_method == '':
                     gjf_content += "%nosave\n"
                 
-                gjf_content += f"# {method}/{basis} {extra_keywords}\n\n"
+                if basis == '':
+                    gjf_content += f"# {method} {extra_keywords}\n\n"
+                else:
+                    gjf_content += f"# {method}/{basis} {extra_keywords}\n\n"
                 gjf_content += f"{name}\n\n"
                 gjf_content += f"{charge}  {mult}\n"
                 gjf_content += '\n'.join(coords) + '\n\n'
+
+                # 如果有Link1部分
+                if link1_method:
+                    gjf_content += "--Link1--\n"
+                    gjf_content += f"%nprocshared={nproc}\n"
+                    if mem:
+                        gjf_content += f"%mem={mem}\n"
+                    gjf_content += f"%chk={name}.chk\n"
+                    if nosave:
+                        gjf_content += "%nosave\n"
+
+                    gjf_content += f"# {link1_method} geom=allcheck\n\n"
                 
                 # 保存gjf文件
                 output_file = os.path.join(self.output_path, f"{name}.gjf")
@@ -1203,7 +1237,10 @@ if __name__ == '__main__':
                         basis_set='def2-TZVPD', nproc=32, maxcore=20000)
     """
 
-    converter = GaussianConverter('/mnt/d/CProLab/CatESP/modeling/datagen/opt_freq_inp/test_freq/fakeg_out', '/mnt/d/CProLab/CatESP/modeling/datagen/opt_freq_inp/test_freq/fakeg_out/gjfs')
-    converter.log_to_gjf(nproc='1', method="external='mlpint'", basis='', extra_keywords='opt(calcfc,nomicro,maxcycle=1000)', mem='8GB',
-    link1_method="freq external='mlpint'", nosave=True)
+    # converter = GaussianConverter('./', './mlip_gjfs')
+    # converter.xyz_to_gjf(nproc='1', method="external='mlpint'", basis='', extra_keywords='opt(calcfc,nomicro,maxcycle=1000)', mem='8GB',
+    # link1_method="freq external='mlpint'", nosave=True)
 
+    converter = GaussianConverter('./', './dft_inps')
+    converter.xyz_to_inp(functional='wB97X-D4', basis_set='def2-TZVP def2/J RIJCOSX TightSCF SlowConv', job_type='Opt Freq', 
+                         nproc=32, maxcore=20000, charge=0, mult=1)
