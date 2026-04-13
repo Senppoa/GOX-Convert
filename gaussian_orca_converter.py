@@ -1039,6 +1039,56 @@ class GaussianConverter:
         
         return success_count
 
+    def out_to_xyz(self) -> int:
+        """
+        将ORCA .out文件转换为xyz文件
+        
+        :return: 成功转换的文件数
+        """
+        # 获取所有out文件
+        if os.path.isfile(self.input_path):
+            out_files = [self.input_path]
+        else:
+            out_files = glob.glob(os.path.join(self.input_path, '*.out'))
+            out_files = natsorted(out_files, alg=ns.PATH)
+
+        if not out_files:
+            print("No .out files found!")
+            return 0
+
+        success_count = 0
+        print(f"Found {len(out_files)} .out file(s)")
+
+        for out_file in tqdm(out_files, desc="Converting .out to .xyz"):
+            filename = os.path.basename(out_file)
+            name = filename.replace('.out', '')
+
+            try:
+                coords, _, _ = self._extract_orca_output_coordinates(out_file)
+
+                if not coords:
+                    print(f"Warning: Could not extract coordinates from {filename}")
+                    continue
+
+                # 构建xyz文件内容
+                xyz_content = f"{len(coords)}\n{name}\n"
+                xyz_content += '\n'.join(coords) + '\n'
+
+                # 保存xyz文件
+                output_file = os.path.join(self.output_path, f"{name}.xyz")
+                with open(output_file, 'w') as f:
+                    f.write(xyz_content)
+
+                success_count += 1
+
+            except Exception as e:
+                print(f"Error converting {filename}: {e}")
+
+        print(f"\nConversion complete! {success_count} files converted.")
+        print(f"Output directory: {self.output_path}")
+
+        return success_count
+
 
 def main():
     """
@@ -1237,10 +1287,17 @@ if __name__ == '__main__':
                         basis_set='def2-TZVPD', nproc=32, maxcore=20000)
     """
 
-    # converter = GaussianConverter('./', './mlip_gjfs')
-    # converter.xyz_to_gjf(nproc='1', method="external='mlpint'", basis='', extra_keywords='opt(calcfc,nomicro,maxcycle=1000)', mem='8GB',
-    # link1_method="freq external='mlpint'", nosave=True)
+    # converter = GaussianConverter('./test_inputs', './test_inputs/mlip_gjfs')
+    # converter.xyz_to_gjf(nproc='1', method="external='./mlpint'", basis='', extra_keywords='opt(calcfc,nomicro,maxcycle=1000)', mem='8GB',
+    # link1_method="freq external='./mlpint'", nosave=True)
 
-    converter = GaussianConverter('./', './dft_inps')
-    converter.xyz_to_inp(functional='wB97X-D4', basis_set='def2-TZVP def2/J RIJCOSX TightSCF SlowConv', job_type='Opt Freq', 
-                         nproc=32, maxcore=20000, charge=0, mult=1)
+    # converter = GaussianConverter('./test_inputs', './test_inputs/dft_inps')
+    # converter.xyz_to_inp(functional='wB97X-D4', basis_set='def2-TZVP def2/J RIJCOSX TightSCF SlowConv Hirshfeld', job_type='Opt', 
+    #                      nproc=32, maxcore=2000, charge=0, mult=1)
+
+    # converter = GaussianConverter('./test_outputs/dft/opt', './test_outputs/dft/freq')
+    # converter.out_to_inp(functional='wB97X-D4', basis_set='def2-TZVP def2/J RIJCOSX TightSCF SlowConv', job_type='Freq', 
+    #                      nproc=32, maxcore=2000)
+
+    converter = GaussianConverter('./test_outputs/dft/opt', './test_outputs/dft/opt/xyz')
+    converter.out_to_xyz()
