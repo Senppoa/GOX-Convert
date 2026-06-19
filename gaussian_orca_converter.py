@@ -524,6 +524,203 @@ class GaussianConverter:
             print(f"Error extracting coordinates from {gjf_file}: {e}")
             return [], 0, 1
     
+    def _parse_sdf_coordinates(self, sdf_file: str) -> Tuple[List[str], str]:
+        """
+        从SDF V2000文件中解析首条记录的坐标
+        
+        :param sdf_file: SDF文件路径
+        :return: (坐标行列表, 分子标题)
+        """
+        try:
+            with open(sdf_file, 'r', encoding='UTF8') as f:
+                lines = f.readlines()
+            
+            if len(lines) < 4:
+                print(f"Warning: {sdf_file} is too short to be a valid SDF file")
+                return [], ''
+            
+            title = lines[0].strip()
+            
+            # 判断SDF格式版本
+            if len(lines) >= 4 and 'V3000' in lines[3]:
+                return self._parse_sdf_v3000(lines, title, sdf_file)
+            else:
+                return self._parse_sdf_v2000(lines, title, sdf_file)
+            
+        except Exception as e:
+            print(f"Error reading {sdf_file}: {e}")
+            return [], ''
+    
+    def _parse_sdf_v2000(self, lines: List[str], title: str, sdf_file: str) -> Tuple[List[str], str]:
+        """
+        解析SDF V2000格式的坐标
+        
+        :param lines: SDF文件行列表
+        :param title: 分子标题
+        :param sdf_file: SDF文件路径（用于日志）
+        :return: (坐标行列表, 分子标题)
+        """
+        if len(lines) < 4:
+            print(f"Warning: {sdf_file} is too short to be a valid SDF V2000 file")
+            return [], ''
+        
+        counts_line = lines[3]
+        parts = counts_line.split()
+        if len(parts) < 2:
+            print(f"Warning: Could not parse counts line in {sdf_file}")
+            return [], ''
+        
+        n_atoms = int(parts[0])
+        
+        coords = []
+        atom_start = 4
+        for i in range(atom_start, min(atom_start + n_atoms, len(lines))):
+            line = lines[i]
+            if len(line) < 34:
+                print(f"Warning: Atom line {i + 1} is too short in {sdf_file}")
+                continue
+            
+            x = line[0:10].strip()
+            y = line[10:20].strip()
+            z = line[20:30].strip()
+            symbol = line[30:34].strip()
+            
+            # 跳过虚原子/占位符
+            if symbol == 'R':
+                continue
+            
+            coords.append(f"{symbol}    {x}   {y}   {z}")
+        
+        return coords, title
+    
+    def _parse_sdf_v3000(self, lines: List[str], title: str, sdf_file: str) -> Tuple[List[str], str]:
+        """
+        解析SDF V3000格式的坐标
+        
+        :param lines: SDF文件行列表
+        :param title: 分子标题
+        :param sdf_file: SDF文件路径（用于日志）
+        :return: (坐标行列表, 分子标题)
+        """
+        coords = []
+        in_atom_block = False
+        
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            
+            if stripped == 'M  V30 BEGIN ATOM':
+                in_atom_block = True
+                continue
+            
+            if stripped == 'M  V30 END ATOM':
+                break
+            
+            if in_atom_block:
+                parts = stripped.split()
+                # V3000原子行格式：M V30 序号 元素符号 x y z ...
+                if len(parts) >= 6 and parts[0] == 'M' and parts[1] == 'V30':
+                    symbol = parts[3]
+                    x = parts[4]
+                    y = parts[5]
+                    z = parts[6]
+                    
+                    # 跳过虚原子/占位符
+                    if symbol == 'R':
+                        continue
+                    
+                    coords.append(f"{symbol}    {x}   {y}   {z}")
+        
+        return coords, title
+    
+    def sdf_to_gjf(self, nproc: str = '32', mem: str = '64GB',
+                   method: str = 'b3lyp', basis: str = 'def2svp',
+                   extra_keywords: str = 'opt freq',
+                   charge: int = 0, mult: int = 1,
+                   link1_method: str = '',
+                   nosave: bool = False) -> int:
+        """
+        将SDF文件转换为gjf文件（仅处理首条分子记录）
+        
+        :param nproc: 处理器核心数
+        :param mem: 内存大小
+        :param method: 计算方法
+        :param basis: 基组
+        :param extra_keywords: 额外关键词
+        :param charge: 电荷
+        :param mult: 自旋多重度
+        :param link1_method: Link1的计算方法
+        :param nosave: 是否添加nosave关键词
+        :return: 成功转换的文件数
+        """
+        # 获取所有sdf文件
+        if os.path.isfile(self.input_path):
+            sdf_files = [self.input_path]
+        else:
+            sdf_files = glob.glob(os.path.join(self.input_path, '*.sdf'))
+            sdf_files = natsorted(sdf_files, alg=ns.PATH)
+        
+        if not sdf_files:
+            print("No sdf files found!")
+            return 0
+        
+        success_count = 0
+        print(f"Found {len(sdf_files)} sdf file(s)")
+        
+        for sdf_file in tqdm(sdf_files, desc="Converting sdf to gjf"):
+            filename = os.path.basename(sdf_file)
+            name = filename.replace('.sdf', '')
+            
+            # 提取坐标
+            coords, title = self._parse_sdf_coordinates(sdf_file)
+            if not coords:
+                print(f"Warning: Could not extract coordinates from {filename}")
+                continue
+            
+            title = title or name
+            
+            # 构建坐标部分
+            coord_section = f"{charge}  {mult}\n"
+            coord_section += '\n'.join(coords) + '\n'
+            
+            # 构建gjf文件内容
+            gjf_content = f"%nprocshared={nproc}\n"
+            if mem:
+                gjf_content += f"%mem={mem}\n"
+            gjf_content += f"%chk={name}.chk\n"
+            if nosave and link1_method == '':
+                gjf_content += "%nosave\n"
+            
+            if basis == '':
+                gjf_content += f"# {method} {extra_keywords}\n\n"
+            else:
+                gjf_content += f"# {method}/{basis} {extra_keywords}\n\n"
+            gjf_content += f"{title}\n\n"
+            gjf_content += coord_section + "\n"
+            
+            # 如果有Link1部分
+            if link1_method:
+                gjf_content += "--Link1--\n"
+                gjf_content += f"%nprocshared={nproc}\n"
+                if mem:
+                    gjf_content += f"%mem={mem}\n"
+                gjf_content += f"%chk={name}.chk\n"
+                if nosave:
+                    gjf_content += "%nosave\n"
+                
+                gjf_content += f"# {link1_method} geom=allcheck\n\n"
+            
+            # 保存gjf文件
+            output_file = os.path.join(self.output_path, f"{name}.gjf")
+            with open(output_file, 'w') as f:
+                f.write(gjf_content)
+            
+            success_count += 1
+        
+        print(f"\nConversion complete! {success_count} files converted.")
+        print(f"Output directory: {self.output_path}")
+        
+        return success_count
+    
     def gjf_to_inp(self, job_type: str = "Opt NumFreq", 
                    functional: str = "wB97M-V", 
                    basis_set: str = "def2-TZVPD",
@@ -1299,5 +1496,19 @@ if __name__ == '__main__':
     # converter.out_to_inp(functional='wB97X-D4', basis_set='def2-TZVP def2/J RIJCOSX TightSCF SlowConv', job_type='Freq', 
     #                      nproc=32, maxcore=2000)
 
-    converter = GaussianConverter('./test_outputs/dft/opt', './test_outputs/dft/opt/xyz')
-    converter.out_to_xyz()
+    # converter = GaussianConverter('./test_outputs/dft/opt', './test_outputs/dft/opt/xyz')
+    # converter.out_to_xyz()
+
+    converter = GaussianConverter('/mnt/d/CProLab/ddg_fit/case_study/Salan/se_opt/gaussian/new_Indanone-ester/S', 
+    '/mnt/d/CProLab/ddg_fit/case_study/Salan/se_opt/gaussian/new_Indanone-ester/S')
+    converter.sdf_to_gjf(
+    nproc='1',
+    mem='8GB',
+    method="external='mlpint'",
+    basis='',
+    extra_keywords='opt(calcfc,nomicro,maxcycle=1000)',
+    charge=1,
+    mult=1,
+    link1_method="freq external='mlpint'",
+    nosave=True
+)
